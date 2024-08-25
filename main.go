@@ -62,6 +62,39 @@ func build() error {
 	return nil
 
 }
+func buildToRemote() error {
+
+	cmd := exec.Command("nixos-rebuild", "build", "--flake", ".#main", "--log-format", "internal-json", "-v", "--target-host", "ver@192.168.178.190", "--use-remote-sudo")
+	cmdNom := exec.Command("nom", "--json")
+	pipeReader, pipeWriter := io.Pipe()
+	cmd.Stdout = pipeWriter
+	cmd.Stderr = pipeWriter
+
+	cmdNom.Stdin = pipeReader
+	cmd.Dir = "/home/ver/.dotfiles/"
+	cmdNom.Stdout = os.Stdout
+	cmdNom.Stderr = os.Stderr
+
+	if err := cmd.Start(); err != nil {
+		log.Fatalf("nixos-rebuild failed: %v", err)
+
+		return err
+	}
+	if err := cmdNom.Start(); err != nil {
+		log.Fatalf("nom failed: %v", err)
+		return err
+	}
+	go func() {
+		cmd.Wait()
+		pipeWriter.Close()
+	}()
+	if err := cmdNom.Wait(); err != nil {
+		log.Fatalf("nom failed to finish: %v", err)
+		return err
+	}
+	return nil
+
+}
 func diff() error {
 	cmd := exec.Command("nvd", "diff", "/run/current-system", "result")
 	cmd.Dir = "/home/ver/.dotfiles/"
@@ -98,10 +131,12 @@ func remove() error {
 	}
 }
 func git() error {
-	cmd := exec.Command("git", "commit", "-am", "NixOS Rebuilt")
+	cmd := exec.Command("git", "commit", "-am", "'NixOS Rebuilt'")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	cmd.Dir = "/home/ver/.dotfiles/"
 	if err := cmd.Run(); err != nil {
-		fmt.Println("failed to commit git changes ", err)
+		fmt.Println("!!! CANT COMMIT GIT CHANGES !!!")
 		return err
 	}
 	return nil
@@ -142,6 +177,7 @@ func askForConfirmation(s string) bool {
 }
 func main() {
 	app := &cli.App{
+		EnableBashCompletion: true,
 		Commands: []*cli.Command{
 
 			{
@@ -173,7 +209,7 @@ func main() {
 							}
 							err = git()
 							if err != nil {
-								return err
+								fmt.Println("!!! CANT COMMIT GIT CHANGES !!!")
 							}
 
 							return nil
@@ -184,7 +220,17 @@ func main() {
 						Usage:   "build on remote machine",
 						Aliases: []string{"r"}, //add to other functions
 						Action: func(cCtx *cli.Context) error {
-							build()
+
+							output("l", "r")
+							err := buildToRemote()
+							if err != nil {
+								return err
+							}
+							err = git()
+							if err != nil {
+								fmt.Println("!!! CANT COMMIT GIT CHANGES !!!")
+							}
+
 							return nil
 						},
 					},
@@ -223,11 +269,11 @@ func main() {
 							}
 							err = git()
 							if err != nil {
-								return err
+								fmt.Println("!!! CANT COMMIT GIT CHANGES")
 							}
 							err = backupFlakeLock()
 							if err != nil {
-								return err
+								fmt.Println("!!! CANT BACKUP flake.lock FILE")
 							}
 							return nil
 						},

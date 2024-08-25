@@ -1,4 +1,4 @@
-module linx
+module nix-orca
 
 go 1.22.5
 

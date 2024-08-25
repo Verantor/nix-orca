@@ -18,7 +18,7 @@ in
     # };
     src = ./.;
 
-    vendorHash = "sha256-mN/QjzJ4eGfbW1H92cCKvC0wDhCR6IUes2HCZ5YBdPA=";
+    vendorHash = "sha256-PG6gCDZGLvWJh7iuaK60/yaGvshA2zracKlhmtQUtkU=";
     # vendorHash = lib.fakeHash;
     meta = with lib; {
       homepage = "https://github.com/Verantor/nix-orca";

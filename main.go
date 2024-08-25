@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -9,7 +10,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func output(build string, push string) {
@@ -261,20 +262,21 @@ func findLineOfInsert(path string) (int, error) {
 }
 
 func main() {
-	app := &cli.App{
-		EnableBashCompletion: true,
-		Commands: []*cli.Command{
+	cmd := &cli.Command{
+		EnableShellCompletion: true,
+		Suggest:               true,
 
+		Commands: []*cli.Command{
 			{
 				Name:    "build",
 				Aliases: []string{"b"}, //add to other functions
 				Usage:   "build config",
-				Subcommands: []*cli.Command{
+				Commands: []*cli.Command{
 					{
 						Name:    "local",
 						Aliases: []string{"l"}, //add to other functions
 						Usage:   "build on local machine",
-						Action: func(cCtx *cli.Context) error {
+						Action: func(_ context.Context, cmd *cli.Command) error {
 							err := build()
 							if err != nil {
 								return err
@@ -302,7 +304,7 @@ func main() {
 						Name:    "remote",
 						Usage:   "build on remote machine",
 						Aliases: []string{"r"}, //add to other functions
-						Action: func(cCtx *cli.Context) error {
+						Action: func(_ context.Context, cmd *cli.Command) error {
 							err := buildToRemote()
 							if err != nil {
 								return err
@@ -321,48 +323,47 @@ func main() {
 				Name:    "update",
 				Aliases: []string{"u"}, //add to other functions
 				Usage:   "update config",
-				Subcommands: []*cli.Command{
-					{
-						Name:    "local",
-						Aliases: []string{"l"}, //add to other functions
-						Usage:   "build on local machine",
-						Action: func(cCtx *cli.Context) error {
-							err := update()
-							if err != nil {
-								return err
-							}
-							err = build()
-							if err != nil {
-								return err
-							}
-							err = diff()
-							if err != nil {
-								return err
-							}
-							err = activate()
-							if err != nil {
-								return err
-							}
-							err = remove()
-							if err != nil {
-								return err
-							}
-							err = git()
-							if err != nil {
-								fmt.Println("!!! CANT COMMIT GIT CHANGES")
-							}
-							err = backupFlakeLock()
-							if err != nil {
-								fmt.Println("!!! CANT BACKUP flake.lock FILE")
-							}
-							return nil
-						},
+				Commands: []*cli.Command{{
+					Name:    "local",
+					Aliases: []string{"l"}, //add to other functions
+					Usage:   "build on local machine",
+					Action: func(_ context.Context, cmd *cli.Command) error {
+						err := update()
+						if err != nil {
+							return err
+						}
+						err = build()
+						if err != nil {
+							return err
+						}
+						err = diff()
+						if err != nil {
+							return err
+						}
+						err = activate()
+						if err != nil {
+							return err
+						}
+						err = remove()
+						if err != nil {
+							return err
+						}
+						err = git()
+						if err != nil {
+							fmt.Println("!!! CANT COMMIT GIT CHANGES")
+						}
+						err = backupFlakeLock()
+						if err != nil {
+							fmt.Println("!!! CANT BACKUP flake.lock FILE")
+						}
+						return nil
 					},
+				},
 					{
 						Name:    "remote",
 						Usage:   "build on remote machine",
 						Aliases: []string{"r"}, //add to other functions
-						Action: func(cCtx *cli.Context) error {
+						Action: func(_ context.Context, cmd *cli.Command) error {
 							err := update()
 							if err != nil {
 								return err
@@ -385,22 +386,35 @@ func main() {
 				Name:    "add",
 				Aliases: []string{"a"}, //add to other functions
 				Usage:   "add package to config",
-				Subcommands: []*cli.Command{
-					{
-						Name:    "homeManager",
-						Aliases: []string{"hm"}, //add to other functions
-						Usage:   "add homeManager package",
-						Action: func(cCtx *cli.Context) error {
-							addPackage(cCtx.Args().First(), "/home/ver/.dotfiles/home/packages.nix")
-							return nil
+				Commands: []*cli.Command{{
+					Name:    "homeManager",
+					Aliases: []string{"hm"}, //add to other functions
+					Usage:   "add homeManager package",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:  "packageName",
+							Value: "Bob",
+							Usage: "Specify the package to install",
 						},
 					},
+					Action: func(_ context.Context, cmd *cli.Command) error {
+						addPackage(cmd.String("packageName"), "/home/ver/.dotfiles/home/packages.nix")
+						return nil
+					},
+				},
 					{
 						Name:    "system",
 						Aliases: []string{"s"}, //add to other functions
 						Usage:   "add system package",
-						Action: func(cCtx *cli.Context) error {
-							addPackage(cCtx.Args().First(), "/home/ver/.dotfiles/hosts/main/system-packages.nix")
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:  "packageName",
+								Value: "Bob",
+								Usage: "Specify the package to install",
+							},
+						},
+						Action: func(_ context.Context, cmd *cli.Command) error {
+							addPackage(cmd.String("packageName"), "/home/ver/.dotfiles/hosts/main/system-packages.nix")
 							return nil
 						},
 					},
@@ -408,8 +422,8 @@ func main() {
 			},
 		},
 	}
-
-	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
-	}
+	cmd.Run(context.Background(), os.Args)
+	// if err := app.Run(os.Args); err != nil {
+	// 	log.Fatal(err)
+	// }
 }

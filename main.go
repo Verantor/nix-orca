@@ -30,19 +30,19 @@ func update() error {
 	}
 }
 func build() error {
-
-	cmd := exec.Command("nixos-rebuild", "build", "--flake", ".#main", "--log-format", "internal-json", "-v")
+	output("LOCAL", "LOCAL")
+	cmdBuild := exec.Command("nixos-rebuild", "build", "--flake", ".#main", "--log-format", "internal-json", "-v")
 	cmdNom := exec.Command("nom", "--json")
 	pipeReader, pipeWriter := io.Pipe()
-	cmd.Stdout = pipeWriter
-	cmd.Stderr = pipeWriter
+	cmdBuild.Stdout = pipeWriter
+	cmdBuild.Stderr = pipeWriter
 
 	cmdNom.Stdin = pipeReader
-	cmd.Dir = "/home/ver/.dotfiles/"
+	cmdBuild.Dir = "/home/ver/.dotfiles/"
 	cmdNom.Stdout = os.Stdout
 	cmdNom.Stderr = os.Stderr
 
-	if err := cmd.Start(); err != nil {
+	if err := cmdBuild.Start(); err != nil {
 		log.Fatalf("nixos-rebuild failed: %v", err)
 
 		return err
@@ -52,7 +52,7 @@ func build() error {
 		return err
 	}
 	go func() {
-		cmd.Wait()
+		cmdBuild.Wait()
 		pipeWriter.Close()
 	}()
 	if err := cmdNom.Wait(); err != nil {
@@ -64,6 +64,7 @@ func build() error {
 }
 func buildToRemote() error {
 
+	output("LOCAL", "REMOTE")
 	cmd := exec.Command("nixos-rebuild", "build", "--flake", ".#main", "--log-format", "internal-json", "-v", "--target-host", "ver@192.168.178.190", "--use-remote-sudo")
 	cmdNom := exec.Command("nom", "--json")
 	pipeReader, pipeWriter := io.Pipe()
@@ -137,6 +138,9 @@ func git() error {
 	cmd.Dir = "/home/ver/.dotfiles/"
 	if err := cmd.Run(); err != nil {
 		fmt.Println("!!! CANT COMMIT GIT CHANGES !!!")
+		fmt.Println("!!! CANT COMMIT GIT CHANGES !!!")
+		fmt.Println("!!! CANT COMMIT GIT CHANGES !!!")
+
 		return err
 	}
 	return nil
@@ -175,6 +179,87 @@ func askForConfirmation(s string) bool {
 		}
 	}
 }
+func addPackage(packageName string, file string) error {
+	line, err := findLineOfInsert(file)
+	if err != nil {
+		return err
+	}
+	err = InsertStringToFile(file, packageName+"\n", line+1)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+func File2lines(filePath string) ([]string, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return LinesFromReader(f)
+}
+
+func LinesFromReader(r io.Reader) ([]string, error) {
+	var lines []string
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return lines, nil
+}
+
+/**
+ * Insert sting to n-th line of file.
+ * If you want to insert a line, append newline '\n' to the end of the string.
+ */
+func InsertStringToFile(path, str string, index int) error {
+	lines, err := File2lines(path)
+	if err != nil {
+		return err
+	}
+
+	fileContent := ""
+	for i, line := range lines {
+		if i == index {
+			fileContent += str
+		}
+		fileContent += line
+		fileContent += "\n"
+	}
+
+	return os.WriteFile(path, []byte(fileContent), 0644)
+}
+func findLineOfInsert(path string) (int, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+
+	// Splits on newlines by default.
+	scanner := bufio.NewScanner(f)
+
+	line := 1
+	// https://golang.org/pkg/bufio/#Scanner.Scan
+	for scanner.Scan() {
+		if strings.Contains(scanner.Text(), "### Insert Point") {
+			return line, nil
+		}
+
+		line++
+	}
+
+	if err := scanner.Err(); err != nil {
+		// Handle the error
+		return 0, err
+	}
+	return line, nil
+}
+
 func main() {
 	app := &cli.App{
 		EnableBashCompletion: true,
@@ -190,7 +275,6 @@ func main() {
 						Aliases: []string{"l"}, //add to other functions
 						Usage:   "build on local machine",
 						Action: func(cCtx *cli.Context) error {
-							output("l", "l")
 							err := build()
 							if err != nil {
 								return err
@@ -209,7 +293,6 @@ func main() {
 							}
 							err = git()
 							if err != nil {
-								fmt.Println("!!! CANT COMMIT GIT CHANGES !!!")
 							}
 
 							return nil
@@ -220,15 +303,12 @@ func main() {
 						Usage:   "build on remote machine",
 						Aliases: []string{"r"}, //add to other functions
 						Action: func(cCtx *cli.Context) error {
-
-							output("l", "r")
 							err := buildToRemote()
 							if err != nil {
 								return err
 							}
 							err = git()
 							if err != nil {
-								fmt.Println("!!! CANT COMMIT GIT CHANGES !!!")
 							}
 
 							return nil
@@ -283,6 +363,18 @@ func main() {
 						Usage:   "build on remote machine",
 						Aliases: []string{"r"}, //add to other functions
 						Action: func(cCtx *cli.Context) error {
+							err := update()
+							if err != nil {
+								return err
+							}
+							err = buildToRemote()
+							if err != nil {
+								return err
+							}
+							err = git()
+							if err != nil {
+							}
+
 							return nil
 						},
 					},
@@ -296,19 +388,19 @@ func main() {
 				Subcommands: []*cli.Command{
 					{
 						Name:    "homeManager",
-						Aliases: []string{"h"}, //add to other functions
-						Usage:   "build on local machine",
+						Aliases: []string{"hm"}, //add to other functions
+						Usage:   "add homeManager package",
 						Action: func(cCtx *cli.Context) error {
-
+							addPackage(cCtx.Args().First(), "/home/ver/.dotfiles/home/packages.nix")
 							return nil
 						},
 					},
 					{
 						Name:    "system",
-						Usage:   "build on remote machine",
 						Aliases: []string{"s"}, //add to other functions
+						Usage:   "add system package",
 						Action: func(cCtx *cli.Context) error {
-
+							addPackage(cCtx.Args().First(), "/home/ver/.dotfiles/hosts/main/system-packages.nix")
 							return nil
 						},
 					},

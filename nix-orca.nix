@@ -10,13 +10,13 @@ in
     pname = "nix-orca";
     inherit version;
 
-    # src = fetchFromGitHub {
-    #   owner = "Verantor";
-    #   repo = "nix-orca";
-    #   rev = "v${version}";
-    #   hash = "sha256-R4sqH4Nx0pQJc3UyuJ3dBd9PSEjyMmlaAlvforUJVH0=";
-    # };
-    src = ./.;
+    src = fetchFromGitHub {
+      owner = "Verantor";
+      repo = "nix-orca";
+      rev = "main";
+      hash = "sha256-7DE7qAfXFrbhR5boxiP/xQl/O4LlO5cjiWdFNgQ1bQ0=";
+    };
+    # src = ./.;
 
     vendorHash = "sha256-PG6gCDZGLvWJh7iuaK60/yaGvshA2zracKlhmtQUtkU=";
     # vendorHash = lib.fakeHash;

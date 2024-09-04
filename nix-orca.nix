@@ -14,7 +14,7 @@ in
       owner = "Verantor";
       repo = "nix-orca";
       rev = "main";
-      hash = "sha256-7DE7qAfXFrbhR5boxiP/xQl/O4LlO5cjiWdFNgQ1bQ0=";
+      hash = "sha256-akrkZgqtChTkv1AWdrECjcMEgkktb0zi4kIIJ5pR5yc=";
     };
     # src = ./.;
 

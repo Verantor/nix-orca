@@ -26,7 +26,7 @@ func update() error {
 	cmd := exec.Command("nix", "flake", "update")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Dir = remoteIp
+	cmd.Dir = directory
 	if err := cmd.Run(); err != nil {
 		fmt.Println("failed to update flake", err)
 		return err

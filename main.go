@@ -13,7 +13,6 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-var directory string = "/home/ver/.dotfiles/"
 var remoteIp string = "192.168.178.190"
 var remoteUser string = "ver"
 
@@ -24,11 +23,11 @@ func output(build string, push string) {
 }
 
 func addPackage(packageName string, file string) (int, error) {
-	line, err := findLineOfInsert(directory+file, "### Insert Point")
+	line, err := findLineOfInsert(file, "### Insert Point")
 	if err != nil {
 		return 0, err
 	}
-	err = InsertStringToFile(directory+file, packageName+"\n", line+1)
+	err = InsertStringToFile(file, packageName+"\n", line+1)
 	if err != nil {
 		return 0, err
 	}
@@ -102,7 +101,7 @@ func findLineOfInsert(path string, text string) (int, error) {
 }
 
 func printAddedPackageRes(file string, line int) error {
-	lines, err := File2lines(directory + file)
+	lines, err := File2lines(file)
 	if err != nil {
 		return err
 	}
@@ -124,6 +123,7 @@ func printAddedPackageRes(file string, line int) error {
 }
 
 func main() {
+
 	cmd := &cli.Command{
 		EnableShellCompletion: true,
 		Suggest:               true,
@@ -138,7 +138,26 @@ func main() {
 			fmt.Fprintf(cmd.Root().Writer, "WRONG: %#v\n", err)
 			return nil
 		},
-
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "config",
+				Aliases: []string{"c"},
+				Usage:   "directory where your config is located",
+				Value:   "/home/ver/.dotfiles/",
+			},
+			&cli.StringFlag{
+				Name:    "hmPackage",
+				Aliases: []string{"hm"},
+				Usage:   "relative location of you homamanager packages.nix",
+				Value:   "./home/packages.nix",
+			},
+			&cli.StringFlag{
+				Name:    "systemPackage",
+				Aliases: []string{"sys"},
+				Value:   "./hosts/main/packages.nix",
+				Usage:   "relative location of you systempackages packages.nix",
+			},
+		},
 		Commands: []*cli.Command{
 			{
 				Name:  "completion",
@@ -176,7 +195,7 @@ func main() {
 						Aliases: []string{"l"}, //add to other functions
 						Usage:   "build on local machine",
 						Action: func(_ context.Context, cmd *cli.Command) error {
-							err := buildOS(false)
+							err := buildOS(false, cmd.String("config"))
 							return err
 						},
 					},
@@ -185,7 +204,7 @@ func main() {
 						Usage:   "build on remote machine",
 						Aliases: []string{"r"}, //add to other functions
 						Action: func(_ context.Context, cmd *cli.Command) error {
-							err := buildOS(true)
+							err := buildOS(true, cmd.String("config"))
 							return err
 						},
 					},
@@ -201,7 +220,7 @@ func main() {
 					Aliases: []string{"l"}, //add to other functions
 					Usage:   "build on local machine",
 					Action: func(_ context.Context, cmd *cli.Command) error {
-						err := updateOS(false)
+						err := updateOS(false, cmd.String("config"))
 						return err
 
 					},
@@ -211,7 +230,7 @@ func main() {
 						Usage:   "build on remote machine",
 						Aliases: []string{"r"}, //add to other functions
 						Action: func(_ context.Context, cmd *cli.Command) error {
-							err := updateOS(true)
+							err := updateOS(true, cmd.String("config"))
 							return err
 						},
 					},
@@ -227,8 +246,7 @@ func main() {
 					Aliases: []string{"hm"}, //add to other functions
 					Usage:   "add homeManager package",
 					Action: func(_ context.Context, cmd *cli.Command) error {
-						relFile := "./home/packages.nix"
-						err := addPackageToOS(cmd.Args().Get(0), relFile)
+						err := addPackageToOS(cmd.Args().Get(0), cmd.String("hmPackage"), cmd.String("config"))
 						return err
 					},
 				},
@@ -237,8 +255,7 @@ func main() {
 						Aliases: []string{"s"}, //add to other functions
 						Usage:   "add system package",
 						Action: func(_ context.Context, cmd *cli.Command) error {
-							relFile := "./hosts/main/system-packages.nix"
-							err := addPackageToOS(cmd.Args().Get(0), relFile)
+							err := addPackageToOS(cmd.Args().Get(0), cmd.String("systemPackage"), cmd.String("config"))
 							return err
 						},
 					},

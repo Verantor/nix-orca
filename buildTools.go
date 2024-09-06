@@ -8,7 +8,7 @@ import (
 	"os/exec"
 )
 
-func update() error {
+func update(directory string) error {
 	cmd := exec.Command("nix", "flake", "update")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -20,7 +20,7 @@ func update() error {
 		return nil
 	}
 }
-func build() error {
+func build(directory string) error {
 	output("LOCAL", "LOCAL")
 	cmdBuild := exec.Command("nixos-rebuild", "build", "--flake", ".#main", "--log-format", "internal-json", "-v")
 	cmdNom := exec.Command("nom", "--json")
@@ -52,7 +52,7 @@ func build() error {
 	return nil
 
 }
-func buildToRemote() error {
+func buildToRemote(directory string) error {
 
 	output("LOCAL", "REMOTE")
 	cmd := exec.Command("nixos-rebuild", "build", "--flake", ".#main", "--log-format", "internal-json", "-v", "--target-host", remoteUser+"@"+remoteIp, "--use-remote-sudo")
@@ -86,7 +86,7 @@ func buildToRemote() error {
 	return nil
 
 }
-func diff() error {
+func diff(directory string) error {
 	cmd := exec.Command("nvd", "diff", "/run/current-system", "result")
 
 	cmd.Dir = directory
@@ -99,7 +99,7 @@ func diff() error {
 		return nil
 	}
 }
-func activate() error {
+func activate(directory string) error {
 	cmd := exec.Command("sudo", "./result/activate")
 
 	cmd.Dir = directory
@@ -114,7 +114,7 @@ func activate() error {
 	}
 
 }
-func remove() error {
+func remove(directory string) error {
 	cmd := exec.Command("rm", "./result")
 
 	cmd.Dir = directory
@@ -125,7 +125,7 @@ func remove() error {
 		return nil
 	}
 }
-func git() error {
+func git(directory string) error {
 	cmd := exec.Command("git", "commit", "-am", "'NixOS Rebuilt'")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -140,7 +140,7 @@ func git() error {
 	}
 	return nil
 }
-func backupFlakeLock() error {
+func backupFlakeLock(directory string) error {
 	if askForConfirmation("Do you want to backup flake.lock") {
 		cmd := exec.Command("cp", "flake.lock", "flakeBackup.lock")
 		cmd.Dir = directory

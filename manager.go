@@ -5,13 +5,13 @@ import (
 	"fmt"
 )
 
-func buildOS(remote bool) error {
+func buildOS(remote bool, directory string) error {
 	if remote {
-		err := buildToRemote()
+		err := buildToRemote(directory)
 		if err != nil {
 			return err
 		}
-		err = git()
+		err = git(directory)
 
 		if err != nil {
 			fmt.Println("!!! CANT COMMIT GIT CHANGES")
@@ -19,23 +19,23 @@ func buildOS(remote bool) error {
 		return nil
 	} else {
 
-		err := build()
+		err := build(directory)
 		if err != nil {
 			return err
 		}
-		err = diff()
+		err = diff(directory)
 		if err != nil {
 			return err
 		}
-		err = activate()
+		err = activate(directory)
 		if err != nil {
 			return err
 		}
-		err = remove()
+		err = remove(directory)
 		if err != nil {
 			return err
 		}
-		err = git()
+		err = git(directory)
 
 		if err != nil {
 			fmt.Println("!!! CANT COMMIT GIT CHANGES")
@@ -43,49 +43,49 @@ func buildOS(remote bool) error {
 		return nil
 	}
 }
-func updateOS(remote bool) error {
+func updateOS(remote bool, directory string) error {
 	if remote {
 
-		err := backupFlakeLock()
+		err := backupFlakeLock(directory)
 		if err != nil {
 			fmt.Println("!!! CANT BACKUP flake.lock FILE")
 		}
-		err = update()
+		err = update(directory)
 		if err != nil {
 			return err
 		}
-		err = buildOS(remote)
+		err = buildOS(remote, directory)
 		if err != nil {
 			return err
 		}
 		return nil
 	} else {
 
-		err := backupFlakeLock()
+		err := backupFlakeLock(directory)
 		if err != nil {
 			fmt.Println("!!! CANT BACKUP flake.lock FILE")
 		}
-		err = update()
+		err = update(directory)
 		if err != nil {
 			return err
 		}
-		err = buildOS(remote)
+		err = buildOS(remote, directory)
 		if err != nil {
 			return err
 		}
 		return nil
 	}
 }
-func addPackageToOS(pName string, relFile string) error {
+func addPackageToOS(pName string, relFile string, directory string) error {
 	if pName == "" {
 		return errors.New("empty Package Name")
 	}
 
-	line, err := addPackage(pName, relFile)
+	line, err := addPackage(pName, directory+relFile)
 	if err != nil {
 		return err
 	}
-	err = printAddedPackageRes(relFile, line)
+	err = printAddedPackageRes(directory+relFile, line)
 	if err != nil {
 		return err
 	}

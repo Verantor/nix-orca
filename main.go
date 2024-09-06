@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/urfave/cli/v3"
 )
 
@@ -49,7 +50,6 @@ func build() error {
 
 	if err := cmdBuild.Start(); err != nil {
 		log.Fatalf("nixos-rebuild failed: %v", err)
-
 		return err
 	}
 	if err := cmdNom.Start(); err != nil {
@@ -70,7 +70,7 @@ func build() error {
 func buildToRemote() error {
 
 	output("LOCAL", "REMOTE")
-	cmd := exec.Command("nixos-rebuild", "build", "--flake", ".#main", "--log-format", "internal-json", "-v", "--target-host", remoteUser, "@", remoteIp, "--use-remote-sudo")
+	cmd := exec.Command("nixos-rebuild", "build", "--flake", ".#main", "--log-format", "internal-json", "-v", "--target-host", remoteUser+"@"+remoteIp, "--use-remote-sudo")
 	cmdNom := exec.Command("nom", "--json")
 	pipeReader, pipeWriter := io.Pipe()
 	cmd.Stdout = pipeWriter
@@ -189,16 +189,16 @@ func askForConfirmation(s string) bool {
 		}
 	}
 }
-func addPackage(packageName string, file string) error {
-	line, err := findLineOfInsert(file)
+func addPackage(packageName string, file string) (int, error) {
+	line, err := findLineOfInsert(directory+file, "### Insert Point")
 	if err != nil {
-		return err
+		return 0, err
 	}
-	err = InsertStringToFile(file, packageName+"\n", line+1)
+	err = InsertStringToFile(directory+file, packageName+"\n", line+1)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+	return line + 1, nil
 }
 func File2lines(filePath string) ([]string, error) {
 	f, err := os.Open(filePath)
@@ -243,7 +243,7 @@ func InsertStringToFile(path, str string, index int) error {
 
 	return os.WriteFile(path, []byte(fileContent), 0644)
 }
-func findLineOfInsert(path string) (int, error) {
+func findLineOfInsert(path string, text string) (int, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, err
@@ -256,7 +256,7 @@ func findLineOfInsert(path string) (int, error) {
 	line := 1
 	// https://golang.org/pkg/bufio/#Scanner.Scan
 	for scanner.Scan() {
-		if strings.Contains(scanner.Text(), "### Insert Point") {
+		if strings.Contains(scanner.Text(), text) {
 			return line, nil
 		}
 
@@ -268,6 +268,28 @@ func findLineOfInsert(path string) (int, error) {
 		return 0, err
 	}
 	return line, nil
+}
+
+func printAddedPackageRes(file string, line int) error {
+	lines, err := File2lines(directory + file)
+	if err != nil {
+		return err
+	}
+	for i := line - 3; i < line+3; i++ {
+		if i >= len(lines) {
+			break
+		}
+		if i == line {
+			d := color.New(color.FgWhite, color.Bold, color.BgRed)
+			d.Printf("+++")
+			fmt.Print(" ")
+			d = color.New(color.FgBlack, color.Bold, color.BgGreen)
+			d.Printf(lines[i] + "\n")
+		} else {
+			fmt.Printf(lines[i] + "\n")
+		}
+	}
+	return nil
 }
 
 func main() {
@@ -304,6 +326,7 @@ func main() {
 							}
 							err = git()
 							if err != nil {
+								return nil
 							}
 
 							return nil
@@ -320,6 +343,7 @@ func main() {
 							}
 							err = git()
 							if err != nil {
+								return nil
 							}
 
 							return nil
@@ -337,7 +361,12 @@ func main() {
 					Aliases: []string{"l"}, //add to other functions
 					Usage:   "build on local machine",
 					Action: func(_ context.Context, cmd *cli.Command) error {
-						err := update()
+						err := backupFlakeLock()
+						if err != nil {
+							fmt.Println("!!! CANT BACKUP flake.lock FILE")
+						}
+
+						err = update()
 						if err != nil {
 							return err
 						}
@@ -361,10 +390,6 @@ func main() {
 						if err != nil {
 							fmt.Println("!!! CANT COMMIT GIT CHANGES")
 						}
-						err = backupFlakeLock()
-						if err != nil {
-							fmt.Println("!!! CANT BACKUP flake.lock FILE")
-						}
 						return nil
 					},
 				},
@@ -383,6 +408,7 @@ func main() {
 							}
 							err = git()
 							if err != nil {
+								return nil
 							}
 
 							return nil
@@ -399,15 +425,20 @@ func main() {
 					Name:    "homeManager",
 					Aliases: []string{"hm"}, //add to other functions
 					Usage:   "add homeManager package",
-					Flags: []cli.Flag{
-						&cli.StringFlag{
-							Name:  "packageName",
-							Value: "Bob",
-							Usage: "Specify the package to install",
-						},
-					},
 					Action: func(_ context.Context, cmd *cli.Command) error {
-						addPackage(cmd.String("packageName"), "/home/ver/.dotfiles/home/packages.nix")
+						pName := cmd.Args().Get(0)
+						if pName == "" {
+							return nil
+						}
+						relFile := "./home/packages.nix"
+						line, err := addPackage(pName, relFile)
+						if err != nil {
+							return err
+						}
+						err = printAddedPackageRes(relFile, line)
+						if err != nil {
+							fmt.Println(err)
+						}
 						return nil
 					},
 				},
@@ -415,15 +446,20 @@ func main() {
 						Name:    "system",
 						Aliases: []string{"s"}, //add to other functions
 						Usage:   "add system package",
-						Flags: []cli.Flag{
-							&cli.StringFlag{
-								Name:  "packageName",
-								Value: "Bob",
-								Usage: "Specify the package to install",
-							},
-						},
 						Action: func(_ context.Context, cmd *cli.Command) error {
-							addPackage(cmd.String("packageName"), "/home/ver/.dotfiles/hosts/main/system-packages.nix")
+							pName := cmd.Args().Get(0)
+							if pName == "" {
+								return nil
+							}
+							relFile := "./hosts/main/system-packages.nix"
+							line, err := addPackage(pName, relFile)
+							if err != nil {
+								return err
+							}
+							err = printAddedPackageRes(relFile, line)
+							if err != nil {
+								fmt.Println(err)
+							}
 							return nil
 						},
 					},

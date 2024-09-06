@@ -296,6 +296,20 @@ func main() {
 	cmd := &cli.Command{
 		EnableShellCompletion: true,
 		Suggest:               true,
+		ShellComplete: func(ctx context.Context, cmd *cli.Command) {
+			fmt.Fprintf(cmd.Root().Writer, "lipstick\nkiss\nme\nlipstick\nringo\n")
+		},
+		CommandNotFound: func(ctx context.Context, cmd *cli.Command, command string) {
+			fmt.Fprintf(cmd.Root().Writer, "Thar be no %q here.\n", command)
+		},
+		OnUsageError: func(ctx context.Context, cmd *cli.Command, err error, isSubcommand bool) error {
+			if isSubcommand {
+				return err
+			}
+
+			fmt.Fprintf(cmd.Root().Writer, "WRONG: %#v\n", err)
+			return nil
+		},
 
 		Commands: []*cli.Command{
 			{
@@ -467,8 +481,7 @@ func main() {
 			},
 		},
 	}
-	cmd.Run(context.Background(), os.Args)
-	// if err := app.Run(os.Args); err != nil {
-	// 	log.Fatal(err)
-	// }
+	if err := cmd.Run(context.Background(), os.Args); err != nil {
+		log.Fatal(err)
+	}
 }

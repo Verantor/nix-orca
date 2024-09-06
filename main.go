@@ -291,14 +291,18 @@ func printAddedPackageRes(file string, line int) error {
 	}
 	return nil
 }
-
+func fishCompletionAction(ctx context.Context, c *cli.Command) error {
+	s, err := c.ToFishCompletion()
+	if err != nil {
+		return fmt.Errorf("generate fish completion: %w", err)
+	}
+	fmt.Fprintln(os.Stdout, s)
+	return nil
+}
 func main() {
 	cmd := &cli.Command{
 		EnableShellCompletion: true,
 		Suggest:               true,
-		ShellComplete: func(ctx context.Context, cmd *cli.Command) {
-			fmt.Fprintf(cmd.Root().Writer, "lipstick\nkiss\nme\nlipstick\nringo\n")
-		},
 		CommandNotFound: func(ctx context.Context, cmd *cli.Command, command string) {
 			fmt.Fprintf(cmd.Root().Writer, "Thar be no %q here.\n", command)
 		},
@@ -313,6 +317,32 @@ func main() {
 
 		Commands: []*cli.Command{
 			{
+				Name:  "completion",
+				Usage: "Output shell completion script for bash, zsh, or fish",
+				Description: `Output shell completion script for bash, zsh, or fish.
+		Source the output to enable completion.
+		nix-orca completion fish > ~/.config/fish/completions/nix-orca.fish
+		`,
+				Commands: []*cli.Command{
+					// {
+					// 	Name:   "bash",
+					// 	Usage:  "Output shell completion script for bash",
+					// 	Action: r.bashCompletionAction,
+					// },
+					// {
+					// 	Name:   "zsh",
+					// 	Usage:  "Output shell completion script for zsh",
+					// 	Action: r.zshCompletionAction,
+					// },
+					{
+						Name:   "fish",
+						Usage:  "Output shell completion script for fish",
+						Action: fishCompletionAction,
+					},
+				},
+			},
+			{
+
 				Name:    "build",
 				Aliases: []string{"b"}, //add to other functions
 				Usage:   "build config",
